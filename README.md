@@ -28,27 +28,27 @@ This tool provides comprehensive network, application, and system telemetry coll
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Kubernetes Pod                          │
-│  ┌──────────────┐         ┌──────────────┐                 │
-│  │ Application  │◄────────┤ lxc interface│                 │
-│  │  Container   │         │  (veth pair) │                 │
-│  └──────────────┘         └───────┬──────┘                 │
-└─────────────────────────────────────┼──────────────────────┘
+│  ┌──────────────┐         ┌──────────────┐                  │
+│  │ Application  │◄────────┤ lxc interface│                  │
+│  │  Container   │         │  (veth pair) │                  │
+│  └──────────────┘         └───────┬──────┘                  │
+└─────────────────────────────────────┼───────────────────────┘
                                       │
                     ┌─────────────────┼─────────────────┐
                     │  eBPF TC Hook   │                 │
                     │  (Kernel Space) │                 │
                     │  ┌──────────────▼──────────────┐  │
-                    │  │ Packet Capture & Analysis  │  │
-                    │  │  - TCP/IP headers          │  │
-                    │  │  - Retransmissions         │  │
-                    │  │  - Packet timing           │  │
-                    │  │  - Flow aggregation        │  │
-                    │  └────────────┬───────────────┘  │
-                    └───────────────┼──────────────────┘
+                    │  │ Packet Capture & Analysis   │  │
+                    │  │  - TCP/IP headers           │  │
+                    │  │  - Retransmissions          │  │
+                    │  │  - Packet timing            │  │
+                    │  │  - Flow aggregation         │  │
+                    │  └────────────┬────────────────┘  │
+                    └───────────────┼───────────────────┘
                                     │
         ┌───────────────────────────┴────────────────────────┐
-        │                                                     │
-        ▼                                                     ▼
+        │                                                    │
+        ▼                                                    ▼
 ┌───────────────────┐                         ┌──────────────────────┐
 │  Hubble Observer  │                         │  System Monitoring   │
 │  (User Space)     │                         │  (psutil)            │
@@ -71,10 +71,10 @@ This tool provides comprehensive network, application, and system telemetry coll
                 └────────────┬───────────────┘
                              │
                              ▼
-                ┌────────────────────────────┐
-                │  CSV Output                │
+                ┌─────────────────────────────┐
+                │  CSV Output                 │
                 │  ml_features_<timestamp>.csv│
-                └────────────────────────────┘
+                └─────────────────────────────┘
 ```
 
 ---
