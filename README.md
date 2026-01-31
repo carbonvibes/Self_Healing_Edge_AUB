@@ -514,10 +514,6 @@ This script:
 
 The `test_heavy_traffic.sh` script simulates realistic network conditions with packet loss to test retransmission detection and performance monitoring.
 
-### Script Location
-```bash
-/home/arjun/Documents/ebpf/test_heavy_traffic.sh
-```
 
 ### What It Does
 
@@ -532,7 +528,6 @@ The `test_heavy_traffic.sh` script simulates realistic network conditions with p
 #### Basic Usage
 ```bash
 # Run with default settings (25% packet loss, 30 seconds)
-cd /home/arjun/Documents/ebpf
 ./test_heavy_traffic.sh
 ```
 
