@@ -1,4 +1,4 @@
-# eBPF + Hubble Network Telemetry Exporter
+# eBPF + Hubble Network Telemetry
 
 ## Overview
 
