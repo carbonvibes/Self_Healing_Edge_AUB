@@ -771,13 +771,3 @@ ebpf/
 - **Kubernetes**: https://kubernetes.io/
 
 ---
-
-## License
-
-This tool is provided as-is for research and educational purposes.
-
----
-
-## Support
-
-For issues, questions, or contributions, please refer to the project repository or contact the maintainer.
