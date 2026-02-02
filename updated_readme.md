@@ -1,4 +1,4 @@
-# eBPF + Hubble Network Telemetry Exporter
+# eBPF + Hubble Network Telemetry
 
 ## Overview
 
@@ -30,25 +30,25 @@ This tool provides comprehensive network, application, and system telemetry coll
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Kubernetes Pod                          │
-│  ┌──────────────┐         ┌──────────────┐                 │
-│  │ Application  │◄────────┤ lxc interface│                 │
-│  │  Container   │         │  (veth pair) │                 │
-│  └──────────────┘         └───────┬──────┘                 │
-└─────────────────────────────────────┼──────────────────────┘
+│  ┌──────────────┐           ┌──────────────┐                │
+│  │ Application  │◄──────────┤ lxc interface│                │
+│  │  Container   │           │  (veth pair) │                │
+│  └──────────────┘           └───────┬──────┘                │
+└─────────────────────────────────────┼───────────────────────┘
                                       │
                     ┌─────────────────┼─────────────────┐
                     │  eBPF TC Hook   │                 │
                     │  (Kernel Space) │                 │
                     │  ┌──────────────▼──────────────┐  │
-                    │  │ Packet Capture & Analysis  │  │
-                    │  │  - TCP/IP headers          │  │
-                    │  │  - Retransmissions         │  │
-                    │  │  - Packet timing           │  │
-                    │  │  - Flow aggregation        │  │
-                    │  └────────────┬───────────────┘  │
-                    └───────────────┼──────────────────┘
+                    │  │ Packet Capture & Analysis   │  │
+                    │  │  - TCP/IP headers           │  │
+                    │  │  - Retransmissions          │  │
+                    │  │  - Packet timing            │  │
+                    │  │  - Flow aggregation         │  │
+                    │  └────────────┬────────────────┘  │
+                    └───────────────┼───────────────────┘
                                     │
-        ┌───────────────────────────┴────────────────────────┐
+        ┌───────────────────────────┴─────────────────────────┐
         │                                                     │
         ▼                                                     ▼
 ┌───────────────────┐                         ┌──────────────────────┐
@@ -73,10 +73,10 @@ This tool provides comprehensive network, application, and system telemetry coll
                 └────────────┬───────────────┘
                              │
                              ▼
-                ┌────────────────────────────┐
-                │  CSV Output                │
+                ┌─────────────────────────────┐
+                │  CSV Output                 │
                 │  ml_features_<timestamp>.csv│
-                └────────────────────────────┘
+                └─────────────────────────────┘
 ```
 
 ---
@@ -203,7 +203,7 @@ Captured via cgroup stats, psutil, and eBPF OOM tracking:
 | `cpu_contention` | CPU > 80% flag | 0 or 1 |
 | `cpu_throttled` | Throttle ratio > 10% flag | 0 or 1 |
 
-**⚠️ Important Note on CPU Throttling Metrics:**
+**Important Note on CPU Throttling Metrics:**
 
 CPU throttling metrics (`cpu_nr_periods`, `cpu_nr_throttled`, `cpu_throttled_time_ms`, `cpu_throttle_ratio`) are collected from cgroup v2 stats. These metrics **only populate when CPU limits are set** on pods. By default, Kubernetes does NOT set resource limits, so these will be 0 in unconstrained environments.
 
@@ -281,6 +281,8 @@ This tool supports supervised learning for **12 types of network and system faul
 ---
 
 ## Installation Guide
+
+### Step 0: Install eBPF BCC Tools
 
 ### Step 1: Install Docker
 
@@ -771,22 +773,6 @@ Download 2: 100% [========================================]
 
 After the test completes:
 
-```bash
-# Find the generated CSV
-ls -lht ml_features_*.csv | head -1
-
-# Check retransmission statistics
-# Columns to examine:
-# - retransmission_count (should be > 0)
-# - retransmission_rate (0.2-0.4 for 25% loss)
-# - consecutive_retrans
-# - tcp_resets
-# - zero_window_count
-
-# Example: Extract retransmission data
-cut -d',' -f1,19,20,21 ml_features_hybrid_<timestamp>.csv | head -20
-```
-
 ### Customization Examples
 
 #### Test with Higher Packet Loss (50%)
@@ -954,6 +940,7 @@ ebpf/
 ├── ml_feature_exporter_minikube.py    # Main eBPF + Hubble collector
 ├── test_heavy_traffic.sh              # Traffic generator with packet loss
 ├── README.md                          # This documentation
+├──
 └── ml_features_hybrid_<timestamp>.csv # Output CSV files
 ```
 
@@ -968,13 +955,3 @@ ebpf/
 - **Kubernetes**: https://kubernetes.io/
 
 ---
-
-## License
-
-This tool is provided as-is for research and educational purposes.
-
----
-
-## Support
-
-For issues, questions, or contributions, please refer to the project repository or contact the maintainer.
