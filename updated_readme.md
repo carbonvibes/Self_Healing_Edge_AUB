@@ -937,10 +937,10 @@ minikube ssh -- "sudo ip link | grep lxc"
 
 ```
 ebpf/
-├── ml_feature_exporter_minikube.py    # Main eBPF + Hubble collector
+├── custom_ebpf_with_hubble_updated.py    # Main eBPF + Hubble collector
 ├── test_heavy_traffic.sh              # Traffic generator with packet loss
 ├── README.md                          # This documentation
-├──
+├── custom_ebpf_with_hubble_updated.py
 └── ml_features_hybrid_<timestamp>.csv # Output CSV files
 ```
 
