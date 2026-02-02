@@ -999,6 +999,13 @@ class SystemHealthAggregator:
         self.oom_kills = 0
         self.window_start = time.time()
         
+        # Track previous cgroup values for delta calculation
+        self.prev_cgroup_stats = {
+            'nr_periods': 0,
+            'nr_throttled': 0,
+            'throttled_usec': 0
+        }
+        
     def process_system_event(self, event):
         """Process system health event from eBPF (OOM only)"""
         if event.event_type == 2:  # Memory (OOM only)
@@ -1032,7 +1039,7 @@ class SystemHealthAggregator:
             metrics['process_cpu_top3'] = "unknown"
         
         # CPU throttling from cgroup (K8s CPU limits)
-        # Aggregate across all pod cgroups, not just root
+        # Calculate DELTA from previous window (rate, not cumulative)
         try:
             total_periods = 0
             total_throttled = 0
@@ -1042,9 +1049,8 @@ class SystemHealthAggregator:
             import glob
             cgroup_paths = []
             
-            # cgroup v2 (unified hierarchy)
-            v2_paths = glob.glob('/sys/fs/cgroup/kubepods.slice/*/cpu.stat')
-            v2_paths += glob.glob('/sys/fs/cgroup/kubepods.slice/*/*/cpu.stat')
+            # cgroup v2 (unified hierarchy) - recurse to catch deep pod slices
+            v2_paths = glob.glob('/sys/fs/cgroup/kubepods.slice/**/cpu.stat', recursive=True)
             cgroup_paths.extend(v2_paths)
             
             # cgroup v1 (legacy)
@@ -1059,7 +1065,7 @@ class SystemHealthAggregator:
                 elif os.path.exists('/sys/fs/cgroup/cpu/cpu.stat'):
                     cgroup_paths = ['/sys/fs/cgroup/cpu/cpu.stat']
             
-            # Aggregate stats from all cgroups
+            # Aggregate CURRENT stats from all cgroups
             for path in cgroup_paths:
                 try:
                     with open(path, 'r') as f:
@@ -1079,13 +1085,24 @@ class SystemHealthAggregator:
                 except:
                     continue
             
-            metrics['cpu_nr_periods'] = total_periods
-            metrics['cpu_nr_throttled'] = total_throttled
-            metrics['cpu_throttled_time_ms'] = total_throttled_usec / 1000.0  # usec -> ms
+            # Calculate DELTA from previous measurement
+            delta_periods = total_periods - self.prev_cgroup_stats['nr_periods']
+            delta_throttled = total_throttled - self.prev_cgroup_stats['nr_throttled']
+            delta_throttled_usec = total_throttled_usec - self.prev_cgroup_stats['throttled_usec']
             
-            # Calculate throttle ratio
-            if total_periods > 0:
-                metrics['cpu_throttle_ratio'] = total_throttled / total_periods
+            # Store current values for next delta
+            self.prev_cgroup_stats['nr_periods'] = total_periods
+            self.prev_cgroup_stats['nr_throttled'] = total_throttled
+            self.prev_cgroup_stats['throttled_usec'] = total_throttled_usec
+            
+            # Use DELTA values (activity in THIS window only)
+            metrics['cpu_nr_periods'] = delta_periods
+            metrics['cpu_nr_throttled'] = delta_throttled
+            metrics['cpu_throttled_time_ms'] = delta_throttled_usec / 1000.0  # usec -> ms
+            
+            # Calculate throttle ratio from DELTA (current window only)
+            if delta_periods > 0:
+                metrics['cpu_throttle_ratio'] = delta_throttled / delta_periods
             else:
                 metrics['cpu_throttle_ratio'] = 0.0
                 
@@ -1230,6 +1247,7 @@ class MLFeatureAggregator:
         }))
         self.completed_features = []
         self.system_aggregator = SystemHealthAggregator()
+        self._system_metrics_cache = {}
         self.bpf_program = None  # Will be set to access BPF maps
         self.last_syn_read = time.time()
         
@@ -1312,8 +1330,9 @@ class MLFeatureAggregator:
                            'connection_duration', 'handshake_latency']:
                     features[key] = 0 if 'count' in key or 'duration' in key else 0.0
                 
-                # Add system metrics
-                system_metrics = self.system_aggregator.get_aggregated_metrics(1.0)
+                # Add system metrics (cache per window)
+                window_id = int(time.time() / self.window_size)
+                system_metrics = self._get_system_metrics_for_window(window_id, self.window_size)
                 features.update(system_metrics)
                 
                 # Labels
@@ -1372,6 +1391,15 @@ class MLFeatureAggregator:
     def process_system_event(self, event):
         """Process system health event"""
         self.system_aggregator.process_system_event(event)
+
+    def _get_system_metrics_for_window(self, window_id, window_duration):
+        """Get system metrics once per window to keep deltas meaningful"""
+        cached = self._system_metrics_cache.get(window_id)
+        if cached is not None:
+            return cached
+        metrics = self.system_aggregator.get_aggregated_metrics(window_duration)
+        self._system_metrics_cache[window_id] = metrics
+        return metrics
     
     def _finalize_old_windows(self, current_time):
         """Finalize windows that are complete"""
@@ -1390,6 +1418,8 @@ class MLFeatureAggregator:
             
             for wid in windows_to_remove:
                 del self.flow_windows[flow_key][wid]
+                if wid in self._system_metrics_cache:
+                    del self._system_metrics_cache[wid]
             
             if not self.flow_windows[flow_key]:
                 flows_to_remove.append(flow_key)
@@ -1669,7 +1699,7 @@ class MLFeatureAggregator:
         
         # ========== SYSTEM HEALTH FEATURES ==========
         
-        system_metrics = self.system_aggregator.get_aggregated_metrics(window_duration)
+        system_metrics = self._get_system_metrics_for_window(window_id, window_duration)
         features.update(system_metrics)
         
         # ========== HUBBLE L7 FEATURES (15) ==========
@@ -2029,7 +2059,8 @@ if __name__ == "__main__":
                 aggregator.generate_blocked_flow_features()
                 
                 features_count = len(aggregator.completed_features)
-                sys_metrics = aggregator.system_aggregator.get_aggregated_metrics(elapsed)
+                window_id = int(current_time / aggregator.window_size)
+                sys_metrics = aggregator._get_system_metrics_for_window(window_id, aggregator.window_size)
                 
                 # Check for SYN flood activity
                 syn_stats = aggregator.get_syn_flood_stats()
